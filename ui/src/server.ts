@@ -132,7 +132,8 @@ const server = Bun.serve({
 
       // Tokenize and count
       const bytes = new TextEncoder().encode(text).byteLength;
-      const tokens = enc.encode(text);
+      // Treat special-token-like substrings as normal text by default
+      const tokens = enc.encode(text, undefined, []);
       const count = tokens.length;
       if (count > maxTokens) {
         return json(
