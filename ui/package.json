@@ -1,1 +1,14 @@
-{\n  "name": "tiktoken-ui",\n  "private": true,\n  "type": "module",\n  "scripts": {\n    "dev": "bun run --hot src/server.ts",\n    "start": "bun run src/server.ts"\n  }\n}\n
+{
+  "name": "tiktoken-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server.ts",
+    "start": "bun src/server.ts"
+  },
+  "dependencies": {
+    "@dqbd/tiktoken": "^1.0.22",
+    "tiktoken": "^1.0.22",
+    "zod": "^3.25.0"
+  }
+}
