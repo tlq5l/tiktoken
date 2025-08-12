@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tiktoken counter</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; line-height: 1.4; }
+      h1 { margin: 0 0 12px; font-size: 20px; }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      textarea { width: 100%; height: 40vh; padding: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; }
+      select, button, input { padding: 8px 10px; font-size: 14px; }
+      .metrics { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+      .card { padding: 10px; border: 1px solid #8884; border-radius: 8px; }
+      .muted { opacity: .75; }
+      .error { color: #c00; }
+      .ok { color: #0a0; }
+    </style>
+  </head>
+  <body>
+    <h1>tiktoken counter</h1>
+    <div class="row" style="margin-bottom:10px">
+      <label for="encoding">Encoding:</label>
+      <select id="encoding"></select>
+      <input id="model" placeholder="or model (e.g. gpt-4o)" style="min-width:220px" />
+      <button id="paste">Paste</button>
+      <button id="clear">Clear</button>
+      <button id="count">Count tokens</button>
+    </div>
+    <textarea id="text" placeholder="Paste text here..."></textarea>
+    <div class="metrics">
+      <div class="card">Chars: <span id="chars" class="muted">0</span></div>
+      <div class="card">Bytes: <span id="bytes" class="muted">0</span></div>
+      <div class="card">Tokens: <span id="tokens" class="muted">0</span></div>
+      <div class="card">Elapsed: <span id="elapsed" class="muted">0 ms</span></div>
+      <div class="card">Status: <span id="status" class="muted">Idle</span></div>
+    </div>
+    <script>
+      const el = (id) => document.getElementById(id);
+      const $enc = el('encoding');
+      const $model = el('model');
+      const $text = el('text');
+      const $paste = el('paste');
+      const $clear = el('clear');
+      const $count = el('count');
+      const $chars = el('chars');
+      const $bytes = el('bytes');
+      const $tokens = el('tokens');
+      const $elapsed = el('elapsed');
+      const $status = el('status');
+
+      function updateLocalMetrics() {
+        const t = $text.value;
+        $chars.textContent = String(t.length);
+        $bytes.textContent = String(new TextEncoder().encode(t).byteLength);
+      }
+
+      async function loadEncodings() {
+        try {
+          const res = await fetch('/encodings');
+          const data = await res.json();
+          const encs = data.encodings || ["o200k_base","cl100k_base","p50k_base","p50k_edit","r50k_base","gpt2"];
+          $enc.innerHTML = encs.map((n) => `<option value="${n}">${n}</option>`).join('');
+          $enc.value = 'o200k_base';
+        } catch (e) {
+          $status.textContent = 'Failed to load encodings';
+          $status.className = 'error';
+        }
+      }
+
+      async function countTokens() {
+        const payload = { text: $text.value, encoding: $enc.value || undefined, model: ($model.value || undefined), maxTokens: 1000000 };
+        $status.textContent = 'Counting...';
+        $status.className = 'muted';
+        $elapsed.textContent = '...';
+        $tokens.textContent = '...';
+        try {
+          const res = await fetch('/count', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            $status.textContent = 'Error: ' + (err.error || res.statusText);
+            $status.className = 'error';
+            return;
+          }
+          const data = await res.json();
+          $tokens.textContent = String(data.count);
+          $elapsed.textContent = String(data.elapsedMs) + ' ms';
+          $status.textContent = 'OK';
+          $status.className = 'ok';
+        } catch (e) {
+          $status.textContent = 'Error: ' + e.message;
+          $status.className = 'error';
+        }
+      }
+
+      $paste.addEventListener('click', async () => {
+        try {
+          const txt = await navigator.clipboard.readText();
+          $text.value = txt;
+          updateLocalMetrics();
+        } catch (e) {
+          alert('Clipboard read failed: ' + e.message);
+        }
+      });
+
+      $clear.addEventListener('click', () => {
+        $text.value = '';
+        updateLocalMetrics();
+        $tokens.textContent = '0';
+        $elapsed.textContent = '0 ms';
+        $status.textContent = 'Idle';
+        $status.className = 'muted';
+      });
+
+      $count.addEventListener('click', countTokens);
+      $text.addEventListener('input', updateLocalMetrics);
+
+      updateLocalMetrics();
+      loadEncodings();
+    </script>
+  </body>
+  </html>
+
+

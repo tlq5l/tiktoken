@@ -1,0 +1,1 @@
+{\n  "name": "tiktoken-ui",\n  "private": true,\n  "type": "module",\n  "scripts": {\n    "dev": "bun run --hot src/server.ts",\n    "start": "bun run src/server.ts"\n  }\n}\n
