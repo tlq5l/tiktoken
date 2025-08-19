@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiktoken - Workspace Selection</title>
+    <style>
+      :root {
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #262626;
+        --bg-tertiary: #333333;
+        --bg-hover: #3a3a3a;
+        --text-primary: #e4e4e4;
+        --text-secondary: #9ca3af;
+        --text-dimmed: #6b7280;
+        --accent-blue: #3b82f6;
+        --accent-green: #10b981;
+        --border: #404040;
+        --button-primary: #3b82f6;
+        --button-hover: #2563eb;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* Header */
+      .header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        padding: 0 20px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .logo-icon {
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, var(--accent-blue), #60a5fa);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      /* Main Container */
+      .main-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+      }
+
+      .workspace-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 40px;
+        width: 100%;
+        max-width: 500px;
+      }
+
+      .workspace-header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .workspace-title {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+
+      .workspace-subtitle {
+        color: var(--text-secondary);
+        font-size: 16px;
+      }
+
+      /* Action Buttons */
+      .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 40px;
+      }
+
+      .btn-primary {
+        flex: 1;
+        padding: 14px 24px;
+        background: var(--button-primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .btn-primary:hover {
+        background: var(--button-hover);
+      }
+
+      .btn-settings {
+        width: 48px;
+        height: 48px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+
+      .btn-settings:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+
+      /* Recent Workspaces */
+      .recent-section {
+        margin-top: 30px;
+      }
+
+      .recent-header {
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .workspace-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .workspace-item {
+        padding: 12px 16px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .workspace-item:hover {
+        background: var(--bg-hover);
+        border-color: var(--accent-blue);
+      }
+
+      .workspace-name {
+        color: var(--accent-blue);
+        font-size: 15px;
+        font-weight: 500;
+      }
+
+      .workspace-count {
+        color: var(--text-dimmed);
+        font-size: 13px;
+      }
+
+      .empty-state {
+        padding: 30px;
+        text-align: center;
+        color: var(--text-dimmed);
+        font-size: 14px;
+      }
+
+      /* File Input (Hidden) */
+      #folder-input {
+        display: none;
+      }
+
+      /* Loading State */
+      .loading {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .loading.active {
+        display: flex;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent-blue);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Responsive */
+      @media (max-width: 600px) {
+        .main-container {
+          padding: 20px;
+        }
+        
+        .workspace-card {
+          padding: 30px 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <div class="logo">
+          <div class="logo-icon">T</div>
+          <span>Tiktoken Context Builder</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+      <div class="workspace-card">
+        <div class="workspace-header">
+          <h1 class="workspace-title">Workspaces</h1>
+          <p class="workspace-subtitle">Open or drag a folder to create a new workspace.</p>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn-primary" onclick="openFolder()">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+            </svg>
+            Open Folder
+          </button>
+          <button class="btn-settings" onclick="openSettings()" title="Settings">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="recent-section">
+          <h2 class="recent-header">Recent workspaces</h2>
+          <div class="workspace-list" id="workspace-list">
+            <!-- Recent workspaces will be loaded here -->
+            <div class="empty-state">
+              No recent workspaces yet.<br>
+              Open a folder to get started.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="folder-input" webkitdirectory directory multiple />
+
+    <script>
+      // Load recent workspaces from localStorage
+      function loadRecentWorkspaces() {
+        const recent = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+        const container = document.getElementById('workspace-list');
+        
+        if (recent.length === 0) {
+          return;
+        }
+        
+        container.innerHTML = recent.map(workspace => `
+          <div class="workspace-item" onclick="openWorkspace('${workspace.path}')">
+            <span class="workspace-name">${workspace.name}</span>
+            <span class="workspace-count">${workspace.fileCount || 0} files</span>
+          </div>
+        `).join('');
+      }
+
+      // Save workspace to recent
+      function saveToRecent(path, name, fileCount) {
+        let recent = JSON.parse(localStorage.getItem('recentWorkspaces') || '[]');
+        
+        // Remove if already exists
+        recent = recent.filter(w => w.path !== path);
+        
+        // Add to beginning
+        recent.unshift({ path, name, fileCount, lastOpened: new Date().toISOString() });
+        
+        // Keep only last 10
+        recent = recent.slice(0, 10);
+        
+        localStorage.setItem('recentWorkspaces', JSON.stringify(recent));
+      }
+
+      // Open folder dialog
+      async function openFolder() {
+        const path = prompt('Enter the path to your codebase:', '/Users/greenapple/code');
+        
+        if (path) {
+          await openWorkspace(path);
+        }
+      }
+
+      // Open a specific workspace
+      async function openWorkspace(path) {
+        const loading = document.getElementById('loading');
+        loading.classList.add('active');
+        
+        try {
+          // Change repository on server
+          const response = await fetch('/api/repo/change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+          });
+          
+          const result = await response.json();
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          // Get file count
+          const filesResponse = await fetch('/api/repo/files');
+          const filesData = await filesResponse.json();
+          const fileCount = filesData.files ? filesData.files.length : 0;
+          
+          // Save to recent
+          const name = path.split('/').pop() || 'Repository';
+          saveToRecent(path, name, fileCount);
+          
+          // Store current workspace
+          sessionStorage.setItem('currentWorkspace', path);
+          
+          // Redirect to main app
+          window.location.href = '/repo-prompt.html';
+          
+        } catch (error) {
+          loading.classList.remove('active');
+          alert(`Error opening workspace: ${error.message}`);
+        }
+      }
+
+      // Settings placeholder
+      function openSettings() {
+        alert('Settings coming soon!');
+      }
+
+      // Handle drag and drop
+      document.addEventListener('DOMContentLoaded', () => {
+        loadRecentWorkspaces();
+        
+        // Drag and drop support
+        const card = document.querySelector('.workspace-card');
+        
+        card.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          card.style.borderColor = 'var(--accent-blue)';
+        });
+        
+        card.addEventListener('dragleave', () => {
+          card.style.borderColor = 'var(--border)';
+        });
+        
+        card.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          card.style.borderColor = 'var(--border)';
+          
+          const items = e.dataTransfer.items;
+          if (items && items.length > 0) {
+            const item = items[0].webkitGetAsEntry();
+            if (item && item.isDirectory) {
+              // Note: We can't get the full path from drag/drop due to security
+              alert('Drag and drop folder selection requires native app support. Please use the Open Folder button instead.');
+            }
+          }
+        });
+      });
+
+      // Check if we should auto-redirect (if workspace is already selected)
+      window.addEventListener('load', () => {
+        const currentWorkspace = sessionStorage.getItem('currentWorkspace');
+        if (currentWorkspace && window.location.search.includes('direct')) {
+          window.location.href = '/repo-prompt.html';
+        }
+      });
+    </script>
+  </body>
+</html>

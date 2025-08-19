@@ -1,0 +1,1610 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiktoken - Repository Context Builder</title>
+    <style>
+      :root {
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #262626;
+        --bg-tertiary: #333333;
+        --bg-hover: #3a3a3a;
+        --bg-selected: rgba(74, 158, 255, 0.1);
+        --text-primary: #e4e4e4;
+        --text-secondary: #9ca3af;
+        --text-dimmed: #6b7280;
+        --accent-blue: #3b82f6;
+        --accent-green: #10b981;
+        --accent-yellow: #f59e0b;
+        --accent-red: #ef4444;
+        --border: #404040;
+        --border-light: #333333;
+        --button-primary: #3b82f6;
+        --button-hover: #2563eb;
+        --input-bg: #1f1f1f;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* Header */
+      .header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        padding: 0 20px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .logo-icon {
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, var(--accent-blue), #60a5fa);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .server-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        background: var(--bg-tertiary);
+        border-radius: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--accent-green);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Main Layout */
+      .main-container {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 320px;
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .search-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+
+      .search-box input {
+        flex: 1;
+        background: none;
+        border: none;
+        color: var(--text-primary);
+        font-size: 14px;
+        outline: none;
+      }
+
+      .search-box input::placeholder {
+        color: var(--text-dimmed);
+      }
+
+      .file-tree {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+
+      .tree-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        user-select: none;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .tree-item:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+
+      .tree-item.selected {
+        background: var(--bg-selected);
+        color: var(--text-primary);
+      }
+
+      .tree-item input[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+      }
+
+      .tree-folder {
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .tree-indent {
+        margin-left: 20px;
+      }
+      
+      .folder-arrow {
+        width: 12px;
+        height: 12px;
+        margin-right: 4px;
+        transition: transform 0.2s;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      
+      .folder-arrow.collapsed {
+        transform: rotate(-90deg);
+      }
+      
+      .tree-children {
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+      }
+      
+      .tree-children.collapsed {
+        max-height: 0 !important;
+      }
+
+      .folder-icon, .file-icon {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+
+      /* Center Content */
+      .content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Top Bar */
+      .top-bar {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .preset-selector {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      .preset-selector:hover {
+        border-color: var(--accent-blue);
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        gap: 2px;
+        padding: 0 20px;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .tab {
+        padding: 10px 16px;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-secondary);
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .tab:hover {
+        color: var(--text-primary);
+      }
+
+      .tab.active {
+        color: var(--text-primary);
+        border-bottom-color: var(--accent-blue);
+      }
+
+      .tab-icon {
+        margin-right: 6px;
+      }
+
+      /* Tab Content */
+      .tab-content {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      /* Instructions Tab */
+      .instructions-container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .instructions-input {
+        width: 100%;
+        min-height: 200px;
+        padding: 12px;
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 14px;
+        resize: vertical;
+        outline: none;
+      }
+
+      .instructions-input:focus {
+        border-color: var(--accent-blue);
+      }
+
+      /* Bottom Panel */
+      .bottom-panel {
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border);
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .metrics {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .metric {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .metric-label {
+        color: var(--text-dimmed);
+      }
+
+      .metric-value {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .token-count {
+        padding: 4px 8px;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+      }
+
+      .token-count.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--accent-yellow);
+      }
+
+      .token-count.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--accent-red);
+      }
+
+      /* Actions */
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        background: var(--button-primary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn:hover {
+        background: var(--button-hover);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+      }
+
+      .btn-secondary:hover {
+        background: var(--bg-hover);
+      }
+
+      .btn-icon {
+        background: none;
+        padding: 8px;
+        color: var(--text-secondary);
+      }
+
+      .btn-icon:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+
+      /* Selected Files Panel */
+      .selected-panel {
+        background: var(--bg-tertiary);
+        border-top: 1px solid var(--border);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .selected-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+      }
+
+      .selected-count {
+        color: var(--accent-blue);
+        font-weight: 500;
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-content {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        width: 90%;
+        max-width: 900px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .modal-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .modal-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+      }
+
+      .modal-close:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+
+      .modal-body {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .modal-footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .code-block {
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 16px;
+        font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      /* Scrollbar Styling */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--bg-hover);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <div class="logo">
+          <div class="logo-icon">T</div>
+          <span>tiktoken</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="server-status">
+          <div class="status-dot"></div>
+          <span>MCP Server</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="7" cy="7" r="4"></circle>
+              <path d="M10 10 L14 14"></path>
+            </svg>
+            <input type="text" placeholder="Search files" id="search-input" />
+          </div>
+        </div>
+        
+        <div class="file-tree" id="file-tree">
+          <div style="padding: 20px; text-align: center; color: var(--text-dimmed);">
+            Loading repository files...
+          </div>
+        </div>
+
+        <div class="selected-panel">
+          <div class="selected-info">
+            <span class="selected-count" id="selected-count">0 files</span>
+            <span style="color: var(--text-dimmed);" id="selected-tokens">~0 tokens</span>
+          </div>
+          <button class="btn-icon" onclick="clearSelection()" title="Clear selection">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+          <div class="preset-selector" onclick="togglePresets()">
+            <span>Presets</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M3 5 L6 8 L9 5" />
+            </svg>
+          </div>
+          <div class="preset-selector" onclick="openCodebasePicker()" style="margin-left: 10px;">
+            <span id="current-repo-name">Select Codebase</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M3 5 L6 8 L9 5" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('instructions')">
+            <span class="tab-icon">✏️</span>Instructions
+          </button>
+          <button class="tab" onclick="switchTab('file-tree')">
+            <span class="tab-icon">🌳</span>File Tree
+          </button>
+          <button class="tab" onclick="switchTab('code-map')">
+            <span class="tab-icon">🗺️</span>Code Map
+          </button>
+          <button class="tab" onclick="switchTab('git')">
+            <span class="tab-icon">📊</span>Git
+          </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content active" id="instructions-tab">
+          <div class="instructions-container">
+            <textarea 
+              class="instructions-input" 
+              id="instructions-input"
+              placeholder="Enter your instructions here..."
+            >hello, this is an example</textarea>
+          </div>
+        </div>
+
+        <div class="tab-content" id="file-tree-tab">
+          <div style="display: flex; flex-direction: column; height: 100%; gap: 16px;">
+            <!-- File tree display -->
+            <div style="flex: 0 0 auto; max-height: 200px; overflow-y: auto;">
+              <div class="code-block" id="file-tree-display" style="margin: 0;">
+                Repository file tree will appear here...
+              </div>
+            </div>
+            
+            <!-- Selected files with token counts -->
+            <div style="flex: 1; overflow-y: auto;">
+              <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 14px; color: var(--text-primary); margin: 0;">Selected Files</h3>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <span id="file-tree-stats" style="font-size: 13px; color: var(--text-secondary);">0 files • 0 tokens</span>
+                  <button class="btn-icon" onclick="clearSelection()" title="Clear all">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div id="selected-files-list" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="padding: 40px; text-align: center; color: var(--text-dimmed);">
+                  No files selected
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="code-map-tab">
+          <div style="padding: 40px; text-align: center; color: var(--text-dimmed);">
+            Code map feature coming soon...
+          </div>
+        </div>
+
+        <div class="tab-content" id="git-tab">
+          <div style="padding: 40px; text-align: center; color: var(--text-dimmed);">
+            Git integration coming soon...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Panel -->
+    <div class="bottom-panel">
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">Selected Files</span>
+          <span class="metric-value" id="bottom-file-count">0 files</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Approx. Token Total:</span>
+          <span class="token-count" id="token-count">~0 Tokens</span>
+        </div>
+      </div>
+      
+      <div class="actions">
+        <button class="btn-secondary" onclick="copyPrompt()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="4" y="4" width="8" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <rect x="6" y="2" width="8" height="10" fill="none" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          Copy
+        </button>
+        <button class="btn-secondary" onclick="xmlCopy()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M3 3 L5 6 L3 9 M13 3 L11 6 L13 9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <rect x="6" y="5" width="4" height="2" fill="currentColor"/>
+          </svg>
+          XML Copy
+        </button>
+        <button class="btn" onclick="generateContext()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 2 L14 8 L8 14 L8 10 C4 10 2 12 2 14 C2 8 4 6 8 6 Z" />
+          </svg>
+          Generate
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="result-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Generated Context</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="code-block" id="result-content"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn" onclick="copyToClipboard()">Copy to Clipboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Folder Picker Modal -->
+    <div class="modal" id="folder-modal">
+      <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+          <h3 class="modal-title">Choose a folder</h3>
+          <button class="modal-close" onclick="closeFolderPicker()">×</button>
+        </div>
+        <div class="modal-body">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <span style="font-size:12px; color: var(--text-dimmed);">Current:</span>
+            <div id="folder-current-path" style="font-family: 'SF Mono','Monaco','Inconsolata','Fira Code', monospace; font-size:12px; padding:6px 8px; background: var(--bg-primary); border:1px solid var(--border); border-radius:4px; flex:1; overflow:auto;"></div>
+            <button class="btn-secondary" onclick="goUpFolder()" title="Go up one level">Up</button>
+            <button class="btn-secondary" onclick="refreshFolderList()" title="Refresh">Refresh</button>
+          </div>
+          <div id="folder-list" class="code-block" style="padding: 0; overflow-y: auto; max-height: 50vh;">
+            <div style="padding: 16px; color: var(--text-dimmed);">Loading...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeFolderPicker()">Cancel</button>
+          <button class="btn" id="choose-folder-btn" onclick="confirmFolderChoice()" disabled>Choose</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let allFiles = [];
+      let selectedFiles = new Set();
+      let lastGeneratedPrompt = '';
+      let fileTree = {};
+      let currentTab = 'instructions';
+      let fileTokenCache = {}; // Cache token counts for files
+      let totalActualTokens = 0;
+
+      // Initialize
+      async function init() {
+        await loadFiles();
+        setupEventListeners();
+      }
+
+      // Load repository files
+      async function loadFiles() {
+        const treeContainer = document.getElementById('file-tree');
+        treeContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-dimmed);">Loading...</div>';
+        
+        try {
+          const response = await fetch('/api/repo/files');
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          allFiles = data.files || [];
+          fileTree = data.tree || {};
+          
+          renderFileTree(fileTree);
+          updateFileTreeDisplay(data.tree);
+          updateMetrics();
+        } catch (error) {
+          console.error('Error loading files:', error);
+          treeContainer.innerHTML = `<div style="padding: 20px; color: var(--accent-red);">Error: ${error.message}</div>`;
+        }
+      }
+
+      // Track collapsed state of folders
+      let collapsedFolders = new Set();
+      
+      // Render file tree in sidebar
+      function renderFileTree(tree, container = null, path = '', level = 0) {
+        if (!container) {
+          container = document.getElementById('file-tree');
+          container.innerHTML = '';
+        }
+        
+        // Sort entries: folders first, then files
+        const entries = Object.entries(tree).filter(([k]) => k !== '_files');
+        const files = tree._files || [];
+        
+        // Render folders
+        entries.forEach(([name, subtree]) => {
+          const fullPath = path ? `${path}/${name}` : name;
+          const folderWrapper = document.createElement('div');
+          
+          const folderItem = createTreeItem(name, fullPath, 'folder', level, subtree);
+          folderWrapper.appendChild(folderItem);
+          
+          // Create children container
+          const childrenContainer = document.createElement('div');
+          childrenContainer.className = 'tree-children';
+          childrenContainer.dataset.folderPath = fullPath;
+          
+          // Check if folder should be collapsed
+          if (collapsedFolders.has(fullPath)) {
+            childrenContainer.classList.add('collapsed');
+          }
+          
+          // Render subfolder contents
+          renderFileTree(subtree, childrenContainer, fullPath, level + 1);
+          
+          // Calculate max-height for animation
+          if (!collapsedFolders.has(fullPath)) {
+            childrenContainer.style.maxHeight = childrenContainer.scrollHeight + 'px';
+          }
+          
+          folderWrapper.appendChild(childrenContainer);
+          container.appendChild(folderWrapper);
+        });
+        
+        // Render files
+        files.forEach(file => {
+          const fullPath = path ? `${path}/${file}` : file;
+          const fileItem = createTreeItem(file, fullPath, 'file', level);
+          container.appendChild(fileItem);
+        });
+      }
+
+      // Create tree item element
+      function createTreeItem(name, path, type, level, subtree = null) {
+        const item = document.createElement('div');
+        item.className = `tree-item ${type === 'folder' ? 'tree-folder' : ''}`;
+        item.style.paddingLeft = `${level * 20}px`;
+        item.dataset.path = path;
+        item.dataset.type = type;
+        
+        // Add arrow for folders
+        if (type === 'folder') {
+          const arrow = document.createElement('svg');
+          arrow.className = 'folder-arrow';
+          if (collapsedFolders.has(path)) {
+            arrow.classList.add('collapsed');
+          }
+          arrow.innerHTML = '<path d="M3 2 L9 6 L3 10 Z" fill="currentColor"/>';
+          arrow.setAttribute('viewBox', '0 0 12 12');
+          arrow.onclick = (e) => {
+            e.stopPropagation();
+            toggleFolderCollapse(path);
+          };
+          item.appendChild(arrow);
+        }
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selectedFiles.has(path);
+        checkbox.onchange = (e) => {
+          e.stopPropagation();
+          if (type === 'folder') {
+            toggleFolder(path, e.target.checked);
+          } else {
+            toggleFile(path, e.target.checked);
+          }
+        };
+        
+        const icon = type === 'folder' ? '📁' : getFileIcon(name);
+        const label = document.createElement('span');
+        label.textContent = name;
+        
+        item.appendChild(checkbox);
+        item.appendChild(document.createTextNode(icon + ' '));
+        item.appendChild(label);
+        
+        item.onclick = (e) => {
+          if (e.target !== checkbox && !e.target.classList.contains('folder-arrow')) {
+            checkbox.checked = !checkbox.checked;
+            if (type === 'folder') {
+              toggleFolder(path, checkbox.checked);
+            } else {
+              toggleFile(path, checkbox.checked);
+            }
+          }
+        };
+        
+        return item;
+      }
+      
+      // Toggle folder collapse/expand
+      function toggleFolderCollapse(folderPath) {
+        const childrenContainer = document.querySelector(`.tree-children[data-folder-path="${folderPath}"]`);
+        const arrow = document.querySelector(`.tree-item[data-path="${folderPath}"] .folder-arrow`);
+        
+        if (!childrenContainer || !arrow) return;
+        
+        if (collapsedFolders.has(folderPath)) {
+          // Expand
+          collapsedFolders.delete(folderPath);
+          arrow.classList.remove('collapsed');
+          childrenContainer.classList.remove('collapsed');
+          // Set max-height for animation
+          childrenContainer.style.maxHeight = childrenContainer.scrollHeight + 'px';
+        } else {
+          // Collapse
+          collapsedFolders.add(folderPath);
+          arrow.classList.add('collapsed');
+          childrenContainer.style.maxHeight = childrenContainer.scrollHeight + 'px';
+          // Force reflow
+          childrenContainer.offsetHeight;
+          childrenContainer.classList.add('collapsed');
+        }
+      }
+
+      // Get file icon based on extension
+      function getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const icons = {
+          'js': '📄',
+          'ts': '📘',
+          'jsx': '⚛️',
+          'tsx': '⚛️',
+          'html': '🌐',
+          'css': '🎨',
+          'json': '📋',
+          'md': '📝',
+          'txt': '📄',
+          'py': '🐍',
+          'go': '🐹',
+          'rs': '🦀',
+          'java': '☕',
+          'c': '🔧',
+          'cpp': '🔧',
+          'h': '📎',
+          'yml': '⚙️',
+          'yaml': '⚙️',
+          'toml': '⚙️',
+          'xml': '📰',
+          'sh': '🖥️',
+          'bat': '🖥️',
+          'gitignore': '🚫',
+          'dockerfile': '🐳',
+          'makefile': '🔨'
+        };
+        return icons[ext] || '📄';
+      }
+
+      // Toggle file selection
+      function toggleFile(path, selected) {
+        if (selected) {
+          selectedFiles.add(path);
+        } else {
+          selectedFiles.delete(path);
+        }
+        updateMetrics();
+        updateCheckboxStates();
+        updateSelectedFilesList();
+      }
+
+      // Toggle folder selection - select/deselect all files in folder
+      function toggleFolder(folderPath, selected) {
+        // Find all files that start with this folder path
+        allFiles.forEach(file => {
+          if (file.startsWith(folderPath + '/') || file === folderPath) {
+            if (selected) {
+              selectedFiles.add(file);
+            } else {
+              selectedFiles.delete(file);
+            }
+          }
+        });
+        
+        // Update all checkboxes in the folder
+        document.querySelectorAll('.tree-item').forEach(item => {
+          const itemPath = item.dataset.path;
+          if (itemPath && (itemPath.startsWith(folderPath + '/') || itemPath === folderPath)) {
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+              checkbox.checked = selected;
+            }
+          }
+        });
+        
+        updateMetrics();
+        updateSelectedFilesList();
+      }
+
+      // Update checkbox states based on selected files
+      function updateCheckboxStates() {
+        document.querySelectorAll('.tree-item').forEach(item => {
+          const path = item.dataset.path;
+          const type = item.dataset.type;
+          const checkbox = item.querySelector('input[type="checkbox"]');
+          
+          if (checkbox && path) {
+            if (type === 'file') {
+              checkbox.checked = selectedFiles.has(path);
+            } else if (type === 'folder') {
+              // Check if all files in folder are selected
+              const folderFiles = allFiles.filter(f => f.startsWith(path + '/'));
+              if (folderFiles.length > 0) {
+                const allSelected = folderFiles.every(f => selectedFiles.has(f));
+                checkbox.checked = allSelected;
+                // Add indeterminate state if partially selected
+                const someSelected = folderFiles.some(f => selectedFiles.has(f));
+                checkbox.indeterminate = someSelected && !allSelected;
+              }
+            }
+          }
+        });
+      }
+
+      // Clear all selections
+      function clearSelection() {
+        selectedFiles.clear();
+        document.querySelectorAll('.tree-item input[type="checkbox"]').forEach(cb => {
+          cb.checked = false;
+        });
+        updateMetrics();
+        updateSelectedFilesList();
+      }
+
+      // Fetch actual token counts from backend
+      async function fetchTokenCounts(files) {
+        if (files.length === 0) return {};
+        
+        try {
+          const response = await fetch('/api/repo/file-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files })
+          });
+          
+          const data = await response.json();
+          if (data.error) {
+            console.error('Token count error:', data.error);
+            return {};
+          }
+          
+          return data.tokenCounts || {};
+        } catch (error) {
+          console.error('Error fetching token counts:', error);
+          return {};
+        }
+      }
+
+      // Update metrics display
+      async function updateMetrics() {
+        const count = selectedFiles.size;
+        document.getElementById('selected-count').textContent = `${count} files`;
+        document.getElementById('bottom-file-count').textContent = `${count} files`;
+        
+        // Update File Tree tab stats
+        const statsElement = document.getElementById('file-tree-stats');
+        if (statsElement) {
+          statsElement.textContent = `${count} files • ${totalActualTokens.toLocaleString()} tokens`;
+        }
+        
+        if (count === 0) {
+          totalActualTokens = 0;
+          document.getElementById('selected-tokens').textContent = '0 tokens';
+          document.getElementById('token-count').textContent = '0 Tokens';
+          document.getElementById('token-count').className = 'token-count';
+          return;
+        }
+        
+        // Get files that need token counting
+        const filesToCount = Array.from(selectedFiles).filter(f => !fileTokenCache[f]);
+        
+        // Show loading state for new files
+        if (filesToCount.length > 0) {
+          document.getElementById('selected-tokens').textContent = 'counting...';
+          document.getElementById('token-count').textContent = 'Counting...';
+        }
+        
+        // Fetch token counts for uncached files
+        if (filesToCount.length > 0) {
+          const newCounts = await fetchTokenCounts(filesToCount);
+          // Update cache
+          Object.assign(fileTokenCache, newCounts);
+        }
+        
+        // Calculate total from cached values
+        totalActualTokens = Array.from(selectedFiles).reduce((sum, file) => {
+          return sum + (fileTokenCache[file] || 0);
+        }, 0);
+        
+        // Update display with actual counts
+        document.getElementById('selected-tokens').textContent = `${totalActualTokens.toLocaleString()} tokens`;
+        
+        const tokenElement = document.getElementById('token-count');
+        tokenElement.textContent = `${totalActualTokens.toLocaleString()} Tokens`;
+        
+        // Update token count styling
+        if (totalActualTokens > 1000000) {
+          tokenElement.className = 'token-count error';
+        } else if (totalActualTokens > 750000) {
+          tokenElement.className = 'token-count warning';
+        } else {
+          tokenElement.className = 'token-count';
+        }
+        
+        // Update File Tree tab stats again with actual tokens
+        if (statsElement) {
+          statsElement.textContent = `${count} files • ${totalActualTokens.toLocaleString()} tokens`;
+        }
+      }
+
+      // Update file tree display
+      function updateFileTreeDisplay(tree) {
+        const display = document.getElementById('file-tree-display');
+        display.textContent = formatTreeForDisplay(tree);
+      }
+
+      // Format tree for display
+      function formatTreeForDisplay(tree, prefix = '', isLast = true) {
+        let result = '';
+        const entries = Object.entries(tree).filter(([k]) => k !== '_files');
+        const files = tree._files || [];
+        
+        entries.forEach(([name, subtree], index) => {
+          const isLastEntry = index === entries.length - 1 && files.length === 0;
+          const symbol = isLastEntry ? '└── ' : '├── ';
+          const nextPrefix = prefix + (isLastEntry ? '    ' : '│   ');
+          
+          result += `${prefix}${symbol}${name}/\n`;
+          if (subtree && typeof subtree === 'object') {
+            result += formatTreeForDisplay(subtree, nextPrefix, isLastEntry);
+          }
+        });
+        
+        files.forEach((file, index) => {
+          const isLastFile = index === files.length - 1;
+          const symbol = isLastFile ? '└── ' : '├── ';
+          result += `${prefix}${symbol}${file}\n`;
+        });
+        
+        return result;
+      }
+
+      // Switch tabs
+      function switchTab(tabName) {
+        currentTab = tabName;
+        
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(tab => {
+          tab.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+      }
+
+      // Generate context
+      async function generateContext() {
+        if (selectedFiles.size === 0) {
+          alert('Please select at least one file');
+          return;
+        }
+        
+        const instructions = document.getElementById('instructions-input').value.trim();
+        if (!instructions) {
+          alert('Please enter instructions');
+          return;
+        }
+        
+        const button = event.target;
+        button.disabled = true;
+        button.textContent = 'Generating...';
+        
+        try {
+          const response = await fetch('/api/repo/complete-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              files: Array.from(selectedFiles),
+              userInstructions: instructions,
+              metaPrompts: [],
+              encoding: 'cl100k_base',
+              maxTokens: 1000000
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          lastGeneratedPrompt = result.prompt;
+          
+          // Update token count
+          const tokenElement = document.getElementById('token-count');
+          tokenElement.textContent = `${result.tokenCount.toLocaleString()} Tokens`;
+          
+          if (result.tokenCount > 1000000) {
+            tokenElement.className = 'token-count error';
+          } else if (result.tokenCount > 750000) {
+            tokenElement.className = 'token-count warning';
+          } else {
+            tokenElement.className = 'token-count';
+          }
+          
+          // Show result
+          document.getElementById('result-content').textContent = result.prompt;
+          document.getElementById('result-modal').classList.add('active');
+          
+        } catch (error) {
+          console.error('Error generating context:', error);
+          alert(`Error: ${error.message}`);
+        } finally {
+          button.disabled = false;
+          button.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2 L14 8 L8 14 L8 10 C4 10 2 12 2 14 C2 8 4 6 8 6 Z" /></svg>Generate';
+        }
+      }
+
+      // Copy functions
+      async function copyPrompt() {
+        if (!lastGeneratedPrompt) {
+          await generateContext();
+        }
+        copyToClipboard();
+      }
+
+      async function xmlCopy() {
+        if (!lastGeneratedPrompt) {
+          await generateContext();
+        }
+        // Wrap in XML tags for structured copy
+        const xmlContent = `<context>\n${lastGeneratedPrompt}\n</context>`;
+        await navigator.clipboard.writeText(xmlContent);
+        showCopyFeedback(event.target);
+      }
+
+      async function copyToClipboard() {
+        if (!lastGeneratedPrompt) {
+          alert('No context generated yet');
+          return;
+        }
+        
+        try {
+          await navigator.clipboard.writeText(lastGeneratedPrompt);
+          showCopyFeedback(event.target);
+        } catch (error) {
+          alert('Failed to copy to clipboard');
+        }
+      }
+
+      function showCopyFeedback(button) {
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '✓ Copied!';
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+        }, 2000);
+      }
+
+      // Modal functions
+      function closeModal() {
+        document.getElementById('result-modal').classList.remove('active');
+      }
+
+      // Search functionality
+      function setupEventListeners() {
+        const searchInput = document.getElementById('search-input');
+        searchInput.addEventListener('input', (e) => {
+          const query = e.target.value.toLowerCase();
+          filterFileTree(query);
+        });
+      }
+
+      function filterFileTree(query) {
+        const items = document.querySelectorAll('.tree-item');
+        items.forEach(item => {
+          const text = item.textContent.toLowerCase();
+          if (query === '' || text.includes(query)) {
+            item.style.display = 'flex';
+          } else {
+            item.style.display = 'none';
+          }
+        });
+      }
+
+      // Placeholder functions
+      function togglePresets() {
+        alert('Presets feature coming soon!');
+      }
+
+      // Folder picker state
+      let folderPicker = {
+        currentPath: '',
+        selectedPath: '',
+        canGoUp: false
+      };
+
+      // Open folder picker UI
+      async function openCodebasePicker() {
+        const modal = document.getElementById('folder-modal');
+        modal.classList.add('active');
+        // Load starting path from server current repo
+        try {
+          const res = await fetch('/api/repo/current');
+          const data = await res.json();
+          folderPicker.currentPath = data.path || '/';
+        } catch {
+          folderPicker.currentPath = '/';
+        }
+        folderPicker.selectedPath = '';
+        document.getElementById('choose-folder-btn').disabled = true;
+        await loadFolderList(folderPicker.currentPath);
+      }
+
+      function closeFolderPicker() {
+        document.getElementById('folder-modal').classList.remove('active');
+      }
+
+      async function loadFolderList(path) {
+        const list = document.getElementById('folder-list');
+        const cur = document.getElementById('folder-current-path');
+        cur.textContent = path;
+        list.innerHTML = '<div style="padding: 16px; color: var(--text-dimmed);">Loading...</div>';
+        try {
+          const res = await fetch(`/api/repo/directories?path=${encodeURIComponent(path)}`);
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          folderPicker.currentPath = data.currentPath;
+          folderPicker.canGoUp = data.canGoUp;
+          renderFolderList(data.directories || []);
+        } catch (e) {
+          list.innerHTML = `<div style="padding: 16px; color: var(--accent-red);">Error: ${e.message}</div>`;
+        }
+      }
+
+      function renderFolderList(dirs) {
+        const list = document.getElementById('folder-list');
+        list.innerHTML = '';
+        const ul = document.createElement('div');
+        ul.style.listStyle = 'none';
+        // Up entry
+        const up = document.createElement('div');
+        up.style.padding = '10px 12px';
+        up.style.cursor = folderPicker.canGoUp ? 'pointer' : 'not-allowed';
+        up.style.borderBottom = '1px solid var(--border)';
+        up.textContent = '⬆️ ..';
+        up.onclick = () => { if (folderPicker.canGoUp) goUpFolder(); };
+        list.appendChild(up);
+        if (!dirs.length) {
+          const empty = document.createElement('div');
+          empty.style.padding = '16px';
+          empty.style.color = 'var(--text-dimmed)';
+          empty.textContent = 'No subdirectories';
+          list.appendChild(empty);
+          return;
+        }
+        dirs.sort((a,b)=>a.name.localeCompare(b.name)).forEach(dir => {
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.alignItems = 'center';
+          row.style.justifyContent = 'space-between';
+          row.style.padding = '10px 12px';
+          row.style.borderBottom = '1px solid var(--border)';
+          row.style.cursor = 'pointer';
+          const left = document.createElement('div');
+          left.style.display = 'flex';
+          left.style.alignItems = 'center';
+          left.style.gap = '8px';
+          const icon = document.createElement('span');
+          icon.textContent = '📁';
+          const name = document.createElement('span');
+          name.textContent = dir.name;
+          left.appendChild(icon);
+          left.appendChild(name);
+          const actions = document.createElement('div');
+          actions.style.display = 'flex';
+          actions.style.gap = '8px';
+          const openBtn = document.createElement('button');
+          openBtn.className = 'btn-secondary';
+          openBtn.textContent = 'Open';
+          openBtn.onclick = (ev) => { ev.stopPropagation(); openFolder(dir.path); };
+          const selectBtn = document.createElement('button');
+          selectBtn.className = 'btn';
+          selectBtn.textContent = 'Select';
+          selectBtn.onclick = (ev) => { ev.stopPropagation(); selectFolder(dir.path); };
+          actions.appendChild(openBtn);
+          actions.appendChild(selectBtn);
+          row.onclick = () => selectFolder(dir.path);
+          row.appendChild(left);
+          row.appendChild(actions);
+          list.appendChild(row);
+        });
+      }
+
+      async function openFolder(path) {
+        folderPicker.selectedPath = '';
+        document.getElementById('choose-folder-btn').disabled = true;
+        await loadFolderList(path);
+      }
+
+      async function goUpFolder() {
+        const cur = folderPicker.currentPath;
+        const parent = cur === '/' ? '/' : cur.split('/').slice(0, -1).join('/') || '/';
+        await openFolder(parent);
+      }
+
+      function selectFolder(path) {
+        folderPicker.selectedPath = path;
+        document.getElementById('choose-folder-btn').disabled = !path;
+        document.getElementById('folder-current-path').textContent = path;
+      }
+
+      async function confirmFolderChoice() {
+        if (!folderPicker.selectedPath) return;
+        await changeCodebaseTo(folderPicker.selectedPath);
+        closeFolderPicker();
+      }
+
+      async function refreshFolderList() {
+        await loadFolderList(folderPicker.currentPath);
+      }
+
+      async function changeCodebaseTo(path) {
+        try {
+          const response = await fetch('/api/repo/change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+          });
+          const result = await response.json();
+          if (!response.ok || result.error) {
+            throw new Error(result.error || `HTTP ${response.status}`);
+          }
+          const newPath = result.path;
+          if (!newPath) throw new Error('No path returned from server');
+          const repoName = newPath.split('/').pop() || 'Repository';
+          document.getElementById('current-repo-name').textContent = repoName;
+          // Clear state
+          selectedFiles.clear();
+          fileTokenCache = {};
+          collapsedFolders.clear();
+          totalActualTokens = 0;
+          allFiles = [];
+          fileTree = {};
+          await loadFiles();
+          // success feedback
+          const repoNameEl = document.getElementById('current-repo-name');
+          repoNameEl.style.transition = 'all 0.3s';
+          const originalStyles = {
+            background: repoNameEl.style.background || '',
+            color: repoNameEl.style.color || '',
+            padding: repoNameEl.style.padding || '',
+            borderRadius: repoNameEl.style.borderRadius || ''
+          };
+          repoNameEl.style.background = '#10b981';
+          repoNameEl.style.color = 'white';
+          repoNameEl.style.padding = '2px 6px';
+          repoNameEl.style.borderRadius = '4px';
+          setTimeout(() => {
+            repoNameEl.style.background = originalStyles.background;
+            repoNameEl.style.color = originalStyles.color;
+            repoNameEl.style.padding = originalStyles.padding;
+            repoNameEl.style.borderRadius = originalStyles.borderRadius;
+          }, 2000);
+        } catch (error) {
+          console.error('Error changing codebase:', error);
+          alert(`Error changing codebase: ${error.message}`);
+        }
+      }
+
+      // Get current repository path on load
+      async function getCurrentRepo() {
+        try {
+          const response = await fetch('/api/repo/current');
+          const data = await response.json();
+          if (data.path) {
+            const repoName = data.path.split('/').pop() || 'Repository';
+            document.getElementById('current-repo-name').textContent = repoName;
+          }
+        } catch (error) {
+          console.error('Error getting current repo:', error);
+        }
+      }
+
+      // Update selected files list in File Tree tab
+      function updateSelectedFilesList() {
+        const listContainer = document.getElementById('selected-files-list');
+        if (!listContainer) return;
+        
+        if (selectedFiles.size === 0) {
+          listContainer.innerHTML = `
+            <div style="padding: 40px; text-align: center; color: var(--text-dimmed);">
+              No files selected
+            </div>
+          `;
+          return;
+        }
+        
+        // Sort selected files alphabetically
+        const sortedFiles = Array.from(selectedFiles).sort();
+        
+        listContainer.innerHTML = '';
+        sortedFiles.forEach(filePath => {
+          const fileItem = document.createElement('div');
+          fileItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+          `;
+          
+          const leftSection = document.createElement('div');
+          leftSection.style.cssText = 'display: flex; align-items: center; gap: 8px; flex: 1;';
+          
+          // File icon
+          const fileName = filePath.split('/').pop();
+          const icon = getFileIcon(fileName);
+          const iconSpan = document.createElement('span');
+          iconSpan.textContent = icon;
+          leftSection.appendChild(iconSpan);
+          
+          // File path
+          const pathSpan = document.createElement('span');
+          pathSpan.style.cssText = 'color: var(--text-primary); word-break: break-all;';
+          pathSpan.textContent = filePath;
+          leftSection.appendChild(pathSpan);
+          
+          // Right section with token count and remove button
+          const rightSection = document.createElement('div');
+          rightSection.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+          
+          // Token count
+          const tokenSpan = document.createElement('span');
+          tokenSpan.style.cssText = 'color: var(--text-secondary); font-size: 12px;';
+          const tokenCount = fileTokenCache[filePath] || 0;
+          tokenSpan.textContent = `${tokenCount.toLocaleString()} tokens`;
+          rightSection.appendChild(tokenSpan);
+          
+          // Remove button
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn-icon';
+          removeBtn.style.cssText = 'padding: 4px; min-width: auto;';
+          removeBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          `;
+          removeBtn.title = 'Remove from selection';
+          removeBtn.onclick = () => {
+            toggleFile(filePath, false);
+          };
+          rightSection.appendChild(removeBtn);
+          
+          fileItem.appendChild(leftSection);
+          fileItem.appendChild(rightSection);
+          listContainer.appendChild(fileItem);
+        });
+      }
+
+      // Initialize on load
+      window.addEventListener('load', async () => {
+        await getCurrentRepo();
+        await init();
+      });
+    </script>
+  </body>
+</html>

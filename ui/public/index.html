@@ -3,11 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>tiktoken counter</title>
+    <title>tiktoken counter + repo context builder</title>
+    <script>
+      // Redirect to workspace selection page for repo context builder
+      // Comment out this line if you want to use the original counter interface
+      window.location.href = '/workspace.html';
+    </script>
     <style>
       :root { color-scheme: light dark; }
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; line-height: 1.4; }
       h1 { margin: 0 0 12px; font-size: 20px; }
+      .tabs { display: flex; border-bottom: 2px solid #8884; margin-bottom: 20px; }
+      .tab { padding: 12px 20px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
+      .tab.active { border-bottom-color: #0084ff; background: #f0f8ff; }
+      .tab-content { display: none; }
+      .tab-content.active { display: block; }
       .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
       textarea { width: 100%; height: 40vh; padding: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; }
       select, button, input { padding: 8px 10px; font-size: 14px; }
@@ -16,27 +26,122 @@
       .muted { opacity: .75; }
       .error { color: #c00; }
       .ok { color: #0a0; }
+      
+      /* Repository Context Builder styles */
+      .repo-container { display: flex; gap: 20px; height: 70vh; }
+      .file-browser { flex: 1; border: 1px solid #8884; border-radius: 8px; overflow: hidden; }
+      .file-browser-header { padding: 12px; background: #f5f5f5; border-bottom: 1px solid #8884; font-weight: bold; }
+      .file-list { height: calc(100% - 50px); overflow-y: auto; padding: 12px; }
+      .file-item { padding: 4px 0; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+      .file-item:hover { background: #f0f8ff; }
+      .file-item input[type="checkbox"] { margin: 0; }
+      .folder { font-weight: bold; color: #0066cc; }
+      .folder::before { content: "📁 "; }
+      .file::before { content: "📄 "; }
+      .context-panel { flex: 1; display: flex; flex-direction: column; }
+      .context-controls { margin-bottom: 12px; }
+      .context-output { flex: 1; border: 1px solid #8884; border-radius: 8px; padding: 12px; overflow-y: auto; background: #fafafa; }
+      .selected-files { margin-bottom: 12px; padding: 8px; border: 1px solid #8884; border-radius: 4px; background: #f9f9f9; max-height: 100px; overflow-y: auto; }
+      .selected-files-header { font-weight: bold; margin-bottom: 4px; }
+      .selected-file-tag { display: inline-block; background: #e3f2fd; padding: 2px 6px; margin: 2px; border-radius: 3px; font-size: 12px; }
+      .indent-1 { margin-left: 20px; }
+      .indent-2 { margin-left: 40px; }
+      .indent-3 { margin-left: 60px; }
+      .loading { opacity: 0.6; pointer-events: none; }
+      .warning { color: #ff8800; }
     </style>
   </head>
   <body>
-    <h1>tiktoken counter</h1>
-    <div class="row" style="margin-bottom:10px">
-      <label for="encoding">Encoding:</label>
-      <select id="encoding"></select>
-      <input id="model" placeholder="or model (e.g. gpt-4o)" style="min-width:220px" />
-      <button id="paste">Paste</button>
-      <button id="clear">Clear</button>
-      <button id="count">Count tokens</button>
+    <h1>tiktoken counter + repo context builder</h1>
+    
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('counter')">Token Counter</div>
+      <div class="tab" onclick="switchTab('context')">Repository Context Builder</div>
     </div>
-    <textarea id="text" placeholder="Paste text here..."></textarea>
-    <div class="metrics">
-      <div class="card">Chars: <span id="chars" class="muted">0</span></div>
-      <div class="card">Bytes: <span id="bytes" class="muted">0</span></div>
-      <div class="card">Tokens: <span id="tokens" class="muted">0</span></div>
-      <div class="card">Elapsed: <span id="elapsed" class="muted">0 ms</span></div>
-      <div class="card">Status: <span id="status" class="muted">Idle</span></div>
+
+    <!-- Token Counter Tab -->
+    <div id="counter-tab" class="tab-content active">
+      <div class="row" style="margin-bottom:10px">
+        <label for="encoding">Encoding:</label>
+        <select id="encoding"></select>
+        <input id="model" placeholder="or model (e.g. gpt-4o)" style="min-width:220px" />
+        <button id="paste">Paste</button>
+        <button id="clear">Clear</button>
+        <button id="count">Count tokens</button>
+      </div>
+      <textarea id="text" placeholder="Paste text here..."></textarea>
+      <div class="metrics">
+        <div class="card">Chars: <span id="chars" class="muted">0</span></div>
+        <div class="card">Bytes: <span id="bytes" class="muted">0</span></div>
+        <div class="card">Tokens: <span id="tokens" class="muted">0</span></div>
+        <div class="card">Elapsed: <span id="elapsed" class="muted">0 ms</span></div>
+        <div class="card">Status: <span id="status" class="muted">Idle</span></div>
+      </div>
     </div>
+
+    <!-- Repository Context Builder Tab -->
+    <div id="context-tab" class="tab-content">
+      <div class="repo-container">
+        <div class="file-browser">
+          <div class="file-browser-header">
+            <span id="repo-path">Repository Files</span>
+            <button onclick="loadFiles()" style="float: right; font-size: 12px;">Refresh</button>
+          </div>
+          <div class="file-list" id="file-list">
+            <div class="muted">Loading files...</div>
+          </div>
+        </div>
+        
+        <div class="context-panel">
+          <div class="selected-files" id="selected-files-panel">
+            <div class="selected-files-header">Selected Files (0):</div>
+            <div id="selected-files-list"></div>
+          </div>
+          
+          <div class="context-controls">
+            <div class="row" style="margin-bottom: 8px;">
+              <select id="context-encoding">
+                <option value="cl100k_base">cl100k_base</option>
+                <option value="o200k_base">o200k_base</option>
+                <option value="p50k_base">p50k_base</option>
+                <option value="gpt2">gpt2</option>
+              </select>
+              <input id="max-tokens" type="number" value="128000" placeholder="Max tokens" style="width: 120px;" />
+              <input id="template" placeholder="Template (optional)" style="width: 150px;" />
+              <button id="generate-context">Generate Context</button>
+              <button id="copy-context">Copy</button>
+            </div>
+            <input id="instruction" placeholder="Custom instruction (optional)" style="width: 100%;" />
+          </div>
+          
+          <div class="context-output" id="context-output">
+            <div class="muted">Select files and click "Generate Context" to create repository context bundle.</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="metrics" style="margin-top: 12px;">
+        <div class="card">Selected: <span id="context-files" class="muted">0 files</span></div>
+        <div class="card">Context Tokens: <span id="context-tokens" class="muted">0</span></div>
+        <div class="card">Token Limit: <span id="context-limit" class="muted">128,000</span></div>
+        <div class="card">Status: <span id="context-status" class="muted">Ready</span></div>
+      </div>
+    </div>
+
     <script>
+      // Tab switching
+      function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+        document.getElementById(`${tab}-tab`).classList.add('active');
+        
+        if (tab === 'context') {
+          loadFiles();
+        }
+      }
+
+      // Original token counter functionality
       const el = (id) => document.getElementById(id);
       const $enc = el('encoding');
       const $model = el('model');
@@ -99,7 +204,6 @@
           const txt = await navigator.clipboard.readText();
           $text.value = txt;
           updateLocalMetrics();
-          // auto-count after paste button
           countTokens();
         } catch (e) {
           alert('Clipboard read failed: ' + e.message);
@@ -117,19 +221,224 @@
 
       $count.addEventListener('click', countTokens);
       $text.addEventListener('input', updateLocalMetrics);
-      // Also auto-count on native paste into textarea
       $text.addEventListener('paste', (e) => {
-        // Let the paste complete, then count
         requestAnimationFrame(() => {
           updateLocalMetrics();
           countTokens();
         });
       });
 
+      // Repository Context Builder functionality
+      let allFiles = [];
+      let selectedFiles = new Set();
+      let fileTree = {};
+
+      async function loadFiles() {
+        const fileList = el('file-list');
+        const repoPath = el('repo-path');
+        const contextStatus = el('context-status');
+        
+        fileList.innerHTML = '<div class="muted">Loading files...</div>';
+        contextStatus.textContent = 'Loading files...';
+        contextStatus.className = 'muted';
+        
+        try {
+          const res = await fetch('/api/repo/files');
+          const data = await res.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          allFiles = data.files;
+          fileTree = data.tree;
+          repoPath.textContent = `Repository: ${data.repoPath}`;
+          
+          renderFileTree();
+          updateSelectedFilesDisplay();
+          
+          contextStatus.textContent = 'Ready';
+          contextStatus.className = 'ok';
+        } catch (e) {
+          fileList.innerHTML = `<div class="error">Error loading files: ${e.message}</div>`;
+          contextStatus.textContent = 'Error loading files';
+          contextStatus.className = 'error';
+        }
+      }
+
+      function renderFileTree() {
+        const fileList = el('file-list');
+        fileList.innerHTML = '';
+        
+        function renderNode(node, path = '', level = 0) {
+          const items = [];
+          
+          // Render directories first
+          Object.keys(node).forEach(key => {
+            if (key === '_files') return;
+            const fullPath = path ? `${path}/${key}` : key;
+            const indent = level > 0 ? `indent-${Math.min(level, 3)}` : '';
+            
+            const dirItem = document.createElement('div');
+            dirItem.className = `file-item folder ${indent}`;
+            dirItem.innerHTML = `
+              <span>${key}/</span>
+            `;
+            items.push(dirItem);
+            
+            // Render subdirectories and files
+            items.push(...renderNode(node[key], fullPath, level + 1));
+          });
+          
+          // Render files
+          if (node._files) {
+            node._files.forEach(file => {
+              const fullPath = path ? `${path}/${file}` : file;
+              const indent = level > 0 ? `indent-${Math.min(level, 3)}` : '';
+              const isSelected = selectedFiles.has(fullPath);
+              
+              const fileItem = document.createElement('div');
+              fileItem.className = `file-item file ${indent}`;
+              fileItem.innerHTML = `
+                <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleFile('${fullPath}')">
+                <span>${file}</span>
+              `;
+              items.push(fileItem);
+            });
+          }
+          
+          return items;
+        }
+        
+        const items = renderNode(fileTree);
+        items.forEach(item => fileList.appendChild(item));
+      }
+
+      function toggleFile(filePath) {
+        if (selectedFiles.has(filePath)) {
+          selectedFiles.delete(filePath);
+        } else {
+          selectedFiles.add(filePath);
+        }
+        updateSelectedFilesDisplay();
+      }
+
+      function updateSelectedFilesDisplay() {
+        const selectedPanel = el('selected-files-panel');
+        const selectedList = el('selected-files-list');
+        const contextFiles = el('context-files');
+        
+        const header = selectedPanel.querySelector('.selected-files-header');
+        header.textContent = `Selected Files (${selectedFiles.size}):`;
+        
+        if (selectedFiles.size === 0) {
+          selectedList.innerHTML = '<div class="muted">No files selected</div>';
+        } else {
+          selectedList.innerHTML = Array.from(selectedFiles)
+            .sort()
+            .map(file => `<span class="selected-file-tag">${file}</span>`)
+            .join('');
+        }
+        
+        contextFiles.textContent = `${selectedFiles.size} files`;
+      }
+
+      async function generateContext() {
+        if (selectedFiles.size === 0) {
+          alert('Please select at least one file');
+          return;
+        }
+        
+        const contextOutput = el('context-output');
+        const contextTokens = el('context-tokens');
+        const contextStatus = el('context-status');
+        const generateBtn = el('generate-context');
+        
+        const payload = {
+          files: Array.from(selectedFiles),
+          template: el('template').value || undefined,
+          instruction: el('instruction').value || undefined,
+          encoding: el('context-encoding').value,
+          maxTokens: parseInt(el('max-tokens').value) || 128000
+        };
+        
+        contextStatus.textContent = 'Generating context...';
+        contextStatus.className = 'muted';
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Generating...';
+        contextOutput.innerHTML = '<div class="muted">Generating context bundle...</div>';
+        
+        try {
+          const res = await fetch('/api/repo/context', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          const data = await res.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          contextTokens.textContent = data.tokenCount.toLocaleString();
+          
+          if (data.isOverLimit) {
+            contextStatus.textContent = 'Warning: Over token limit';
+            contextStatus.className = 'warning';
+            contextTokens.className = 'warning';
+          } else {
+            contextStatus.textContent = 'Generated successfully';
+            contextStatus.className = 'ok';
+            contextTokens.className = 'ok';
+          }
+          
+          contextOutput.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${data.output}</pre>`;
+          
+          // Store the output for copying
+          window.lastGeneratedContext = data.output;
+          
+        } catch (e) {
+          contextStatus.textContent = 'Error: ' + e.message;
+          contextStatus.className = 'error';
+          contextOutput.innerHTML = `<div class="error">Error generating context: ${e.message}</div>`;
+        } finally {
+          generateBtn.disabled = false;
+          generateBtn.textContent = 'Generate Context';
+        }
+      }
+
+      async function copyContext() {
+        if (!window.lastGeneratedContext) {
+          alert('No context generated yet');
+          return;
+        }
+        
+        try {
+          await navigator.clipboard.writeText(window.lastGeneratedContext);
+          const copyBtn = el('copy-context');
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+          }, 2000);
+        } catch (e) {
+          alert('Failed to copy to clipboard: ' + e.message);
+        }
+      }
+
+      // Update token limit display when max-tokens changes
+      el('max-tokens').addEventListener('input', (e) => {
+        el('context-limit').textContent = parseInt(e.target.value).toLocaleString();
+      });
+
+      // Event listeners for context builder
+      el('generate-context').addEventListener('click', generateContext);
+      el('copy-context').addEventListener('click', copyContext);
+
+      // Initialize
       updateLocalMetrics();
       loadEncodings();
     </script>
   </body>
-  </html>
-
-
+</html>

@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Repository Context Builder - Tiktoken</title>
+    <style>
+      :root { 
+        --bg-primary: #1e1e1e;
+        --bg-secondary: #2d2d2d;
+        --bg-tertiary: #3a3a3a;
+        --bg-hover: #404040;
+        --text-primary: #e4e4e4;
+        --text-secondary: #a0a0a0;
+        --text-dimmed: #6a6a6a;
+        --accent-blue: #4a9eff;
+        --accent-green: #4ade80;
+        --accent-yellow: #fbbf24;
+        --accent-red: #f87171;
+        --border: #404040;
+        --border-light: #333;
+        --tab-active: #2d2d2d;
+        --button-bg: #4a9eff;
+        --button-hover: #3b8eee;
+        --selection-bg: rgba(74, 158, 255, 0.1);
+      }
+      
+      * {
+        box-sizing: border-box;
+      }
+      
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.5;
+        height: 100vh;
+        overflow: hidden;
+      }
+      
+      /* Header */
+      .header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      
+      .logo-icon {
+        width: 20px;
+        height: 20px;
+        background: var(--accent-blue);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+      
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      
+      .main-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 20px;
+        height: calc(100vh - 120px);
+      }
+      
+      /* File Browser */
+      .file-browser {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .file-browser-header {
+        padding: 12px;
+        background: var(--bg-light);
+        border-bottom: 1px solid var(--border);
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .file-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+      
+      .file-item {
+        padding: 4px 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 4px;
+        user-select: none;
+      }
+      
+      .file-item:hover {
+        background: var(--bg-hover);
+      }
+      
+      .file-item input[type="checkbox"] {
+        margin: 0;
+      }
+      
+      .folder {
+        font-weight: 600;
+      }
+      
+      /* Prompt Builder */
+      .prompt-builder {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .section {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      
+      .section-header {
+        padding: 10px 15px;
+        background: var(--bg-light);
+        border-bottom: 1px solid var(--border);
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .section-content {
+        padding: 15px;
+      }
+      
+      /* Prompt sections */
+      .prompt-sections {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 15px;
+        height: 100%;
+      }
+      
+      .file-tree-preview {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #fafafa;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre;
+      }
+      
+      .selected-files-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      
+      .file-tag {
+        background: #e3f2fd;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      
+      .meta-prompts {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .meta-prompt-item {
+        display: grid;
+        grid-template-columns: 150px 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+      
+      input, textarea, select {
+        padding: 8px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-family: inherit;
+      }
+      
+      textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+      
+      button {
+        padding: 8px 16px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      
+      button:hover {
+        opacity: 0.9;
+      }
+      
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      .btn-secondary {
+        background: #666;
+      }
+      
+      .btn-small {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      
+      /* Footer */
+      .footer {
+        margin-top: 20px;
+        padding: 15px;
+        background: var(--bg-light);
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .metrics {
+        display: flex;
+        gap: 20px;
+      }
+      
+      .metric {
+        display: flex;
+        gap: 5px;
+      }
+      
+      .metric-label {
+        opacity: 0.7;
+      }
+      
+      .metric-value {
+        font-weight: bold;
+      }
+      
+      .warning {
+        color: #ff8800;
+      }
+      
+      .error {
+        color: #cc0000;
+      }
+      
+      .success {
+        color: #00aa00;
+      }
+      
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .modal.active {
+        display: flex;
+      }
+      
+      .modal-content {
+        background: white;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .modal-header {
+        padding: 15px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .modal-body {
+        padding: 15px;
+        flex: 1;
+        overflow-y: auto;
+      }
+      
+      .modal-footer {
+        padding: 15px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>
+        <span>🏗️ Repository Context Builder</span>
+        <small style="opacity: 0.7; font-size: 14px;">tiktoken-powered</small>
+      </h1>
+      
+      <div class="main-layout">
+        <!-- File Browser -->
+        <div class="file-browser">
+          <div class="file-browser-header">
+            <span>Repository Files</span>
+            <button class="btn-small" onclick="refreshFiles()">Refresh</button>
+          </div>
+          <div class="file-list" id="file-list">
+            <div style="padding: 20px; text-align: center; opacity: 0.5;">
+              Loading files...
+            </div>
+          </div>
+        </div>
+        
+        <!-- Prompt Builder -->
+        <div class="prompt-builder">
+          <div class="prompt-sections">
+            <!-- File Tree Section -->
+            <div class="section">
+              <div class="section-header">
+                <span>📁 File Tree (All Repository Files)</span>
+                <span id="tree-file-count" class="metric-value">0 files</span>
+              </div>
+              <div class="section-content">
+                <div class="file-tree-preview" id="file-tree-preview">
+                  Repository file tree will appear here...
+                </div>
+              </div>
+            </div>
+            
+            <!-- Selected Files Section -->
+            <div class="section">
+              <div class="section-header">
+                <span>📄 Selected File Contents</span>
+                <span id="selected-count" class="metric-value">0 files</span>
+              </div>
+              <div class="section-content">
+                <div class="selected-files-list" id="selected-files">
+                  <span style="opacity: 0.5;">No files selected</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Meta Prompts Section -->
+            <div class="section">
+              <div class="section-header">
+                <span>🎯 Meta Prompts (Optional Templates)</span>
+                <button class="btn-small btn-secondary" onclick="addMetaPrompt()">+ Add</button>
+              </div>
+              <div class="section-content">
+                <div class="meta-prompts" id="meta-prompts">
+                  <div class="meta-prompt-item">
+                    <input type="text" placeholder="Name (e.g., Architect)" value="Architect" />
+                    <textarea placeholder="Meta prompt content...">You are a senior software architect...</textarea>
+                    <button class="btn-small btn-secondary" onclick="removeMetaPrompt(this)">Remove</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- User Instructions Section -->
+            <div class="section">
+              <div class="section-header">
+                <span>✏️ User Instructions</span>
+              </div>
+              <div class="section-content">
+                <textarea id="user-instructions" style="width: 100%; min-height: 150px;" placeholder="Enter your specific instructions or request here..."></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Footer Controls -->
+      <div class="footer">
+        <div class="metrics">
+          <div class="metric">
+            <span class="metric-label">Encoding:</span>
+            <select id="encoding">
+              <option value="cl100k_base">cl100k_base</option>
+              <option value="o200k_base">o200k_base</option>
+              <option value="p50k_base">p50k_base</option>
+              <option value="gpt2">gpt2</option>
+            </select>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Max Tokens:</span>
+            <input type="number" id="max-tokens" value="128000" style="width: 100px;" />
+          </div>
+          <div class="metric">
+            <span class="metric-label">Token Count:</span>
+            <span id="token-count" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Status:</span>
+            <span id="status" class="metric-value">Ready</span>
+          </div>
+        </div>
+        <div>
+          <button onclick="generatePrompt()">Generate Complete Prompt</button>
+          <button class="btn-secondary" onclick="copyToClipboard()">Copy to Clipboard</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Result Modal -->
+    <div class="modal" id="result-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Generated Prompt</h3>
+          <button onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <pre id="result-content"></pre>
+        </div>
+        <div class="modal-footer">
+          <button onclick="copyToClipboard()">Copy to Clipboard</button>
+          <button class="btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      let allFiles = [];
+      let selectedFiles = new Set();
+      let lastGeneratedPrompt = '';
+      let fileTreeString = '';
+      
+      async function refreshFiles() {
+        const fileList = document.getElementById('file-list');
+        const treePreview = document.getElementById('file-tree-preview');
+        const status = document.getElementById('status');
+        
+        fileList.innerHTML = '<div style="padding: 20px; text-align: center; opacity: 0.5;">Loading...</div>';
+        status.textContent = 'Loading files...';
+        status.className = 'metric-value';
+        
+        try {
+          const response = await fetch('/api/repo/files');
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          allFiles = data.files || [];
+          fileTreeString = formatTreeForDisplay(data.tree);
+          
+          // Update file tree preview
+          treePreview.textContent = data.repoPath + '\n' + fileTreeString;
+          document.getElementById('tree-file-count').textContent = `${allFiles.length} files`;
+          
+          // Render file list
+          renderFileList(data.tree);
+          
+          status.textContent = 'Ready';
+          status.className = 'metric-value success';
+        } catch (error) {
+          console.error('Error loading files:', error);
+          fileList.innerHTML = `<div style="padding: 20px; color: red;">Error: ${error.message}</div>`;
+          status.textContent = 'Error';
+          status.className = 'metric-value error';
+        }
+      }
+      
+      function formatTreeForDisplay(tree, prefix = '', isLast = true) {
+        let result = '';
+        const entries = Object.entries(tree).filter(([k]) => k !== '_files');
+        const files = tree._files || [];
+        
+        // Directories
+        entries.forEach(([name, subtree], index) => {
+          const isLastEntry = index === entries.length - 1 && files.length === 0;
+          const symbol = isLastEntry ? '└── ' : '├── ';
+          const nextPrefix = prefix + (isLastEntry ? '    ' : '│   ');
+          
+          result += `${prefix}${symbol}${name}/\n`;
+          if (subtree && typeof subtree === 'object') {
+            result += formatTreeForDisplay(subtree, nextPrefix, isLastEntry);
+          }
+        });
+        
+        // Files
+        files.forEach((file, index) => {
+          const isLastFile = index === files.length - 1;
+          const symbol = isLastFile ? '└── ' : '├── ';
+          result += `${prefix}${symbol}${file}\n`;
+        });
+        
+        return result;
+      }
+      
+      function renderFileList(tree, path = '', container = null) {
+        if (!container) {
+          const fileList = document.getElementById('file-list');
+          fileList.innerHTML = '';
+          container = fileList;
+        }
+        
+        // Render directories
+        Object.keys(tree).forEach(key => {
+          if (key === '_files') return;
+          
+          const fullPath = path ? `${path}/${key}` : key;
+          const dirItem = document.createElement('div');
+          dirItem.className = 'file-item folder';
+          dirItem.innerHTML = `<span>📁 ${key}/</span>`;
+          container.appendChild(dirItem);
+          
+          // Recursively render subdirectory contents
+          const subContainer = document.createElement('div');
+          subContainer.style.marginLeft = '20px';
+          container.appendChild(subContainer);
+          renderFileList(tree[key], fullPath, subContainer);
+        });
+        
+        // Render files
+        if (tree._files) {
+          tree._files.forEach(file => {
+            const fullPath = path ? `${path}/${file}` : file;
+            const isSelected = selectedFiles.has(fullPath);
+            
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+              <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleFile('${fullPath}', this.checked)" />
+              <span>📄 ${file}</span>
+            `;
+            container.appendChild(fileItem);
+          });
+        }
+      }
+      
+      function toggleFile(filePath, isChecked) {
+        if (isChecked) {
+          selectedFiles.add(filePath);
+        } else {
+          selectedFiles.delete(filePath);
+        }
+        updateSelectedFiles();
+      }
+      
+      function updateSelectedFiles() {
+        const container = document.getElementById('selected-files');
+        const count = document.getElementById('selected-count');
+        
+        count.textContent = `${selectedFiles.size} files`;
+        
+        if (selectedFiles.size === 0) {
+          container.innerHTML = '<span style="opacity: 0.5;">No files selected</span>';
+        } else {
+          container.innerHTML = Array.from(selectedFiles)
+            .sort()
+            .map(file => `<span class="file-tag">${file}</span>`)
+            .join('');
+        }
+      }
+      
+      function addMetaPrompt() {
+        const container = document.getElementById('meta-prompts');
+        const item = document.createElement('div');
+        item.className = 'meta-prompt-item';
+        item.innerHTML = `
+          <input type="text" placeholder="Name (e.g., Reviewer)" />
+          <textarea placeholder="Meta prompt content..."></textarea>
+          <button class="btn-small btn-secondary" onclick="removeMetaPrompt(this)">Remove</button>
+        `;
+        container.appendChild(item);
+      }
+      
+      function removeMetaPrompt(button) {
+        button.parentElement.remove();
+      }
+      
+      async function generatePrompt() {
+        if (selectedFiles.size === 0) {
+          alert('Please select at least one file');
+          return;
+        }
+        
+        const status = document.getElementById('status');
+        const tokenCount = document.getElementById('token-count');
+        const button = event.target;
+        
+        button.disabled = true;
+        status.textContent = 'Generating...';
+        status.className = 'metric-value';
+        
+        // Collect meta prompts
+        const metaPrompts = [];
+        document.querySelectorAll('.meta-prompt-item').forEach(item => {
+          const name = item.querySelector('input').value.trim();
+          const content = item.querySelector('textarea').value.trim();
+          if (name && content) {
+            metaPrompts.push({ name, content });
+          }
+        });
+        
+        // Get user instructions
+        const userInstructions = document.getElementById('user-instructions').value.trim();
+        if (!userInstructions) {
+          alert('Please enter user instructions');
+          button.disabled = false;
+          status.textContent = 'Ready';
+          return;
+        }
+        
+        const payload = {
+          files: Array.from(selectedFiles),
+          userInstructions,
+          metaPrompts,
+          encoding: document.getElementById('encoding').value,
+          maxTokens: parseInt(document.getElementById('max-tokens').value)
+        };
+        
+        try {
+          const response = await fetch('/api/repo/complete-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          const result = await response.json();
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          lastGeneratedPrompt = result.prompt;
+          tokenCount.textContent = result.tokenCount.toLocaleString();
+          
+          if (result.tokenCount > payload.maxTokens) {
+            tokenCount.className = 'metric-value warning';
+            status.textContent = 'Over limit!';
+            status.className = 'metric-value warning';
+          } else {
+            tokenCount.className = 'metric-value success';
+            status.textContent = 'Generated';
+            status.className = 'metric-value success';
+          }
+          
+          // Show result
+          document.getElementById('result-content').textContent = result.prompt;
+          document.getElementById('result-modal').classList.add('active');
+          
+        } catch (error) {
+          console.error('Error generating prompt:', error);
+          status.textContent = 'Error';
+          status.className = 'metric-value error';
+          alert(`Error: ${error.message}`);
+        } finally {
+          button.disabled = false;
+        }
+      }
+      
+      async function copyToClipboard() {
+        if (!lastGeneratedPrompt) {
+          alert('No prompt generated yet');
+          return;
+        }
+        
+        try {
+          await navigator.clipboard.writeText(lastGeneratedPrompt);
+          const button = event.target;
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          setTimeout(() => {
+            button.textContent = originalText;
+          }, 2000);
+        } catch (error) {
+          alert('Failed to copy to clipboard');
+        }
+      }
+      
+      function closeModal() {
+        document.getElementById('result-modal').classList.remove('active');
+      }
+      
+      // Initialize on load
+      window.addEventListener('load', () => {
+        refreshFiles();
+      });
+    </script>
+  </body>
+</html>
