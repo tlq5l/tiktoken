@@ -359,7 +359,10 @@
         <div class="file-browser">
           <div class="file-browser-header">
             <span>Repository Files</span>
-            <button class="btn-small" onclick="refreshFiles()">Refresh</button>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-small" onclick="refreshFiles()">Refresh</button>
+              <button class="btn-small btn-secondary" onclick="openIgnoreSettings()">Ignore</button>
+            </div>
           </div>
           <div class="file-list" id="file-list">
             <div style="padding: 20px; text-align: center; opacity: 0.5;">
@@ -472,6 +475,35 @@
         <div class="modal-footer">
           <button onclick="copyToClipboard()">Copy to Clipboard</button>
           <button class="btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal" id="ignore-modal">
+      <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+          <h3>Ignore Patterns</h3>
+          <button onclick="closeIgnoreSettings()">×</button>
+        </div>
+        <div class="modal-body">
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <div style="opacity:0.7; font-size:12px; margin-bottom:4px;">Defaults (read-only)</div>
+              <pre id="ignore-defaults" style="max-height:150px;"></pre>
+            </div>
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="opacity:0.7; font-size:12px;">Additional patterns (one per line)</span>
+                <button class="btn-small btn-secondary" onclick="resetIgnoreSettings()">Reset</button>
+              </div>
+              <textarea id="ignore-extra" style="width:100%; min-height:140px;" placeholder="e.g. **/tmp/**
+logs/**"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeIgnoreSettings()">Cancel</button>
+          <button onclick="saveIgnoreSettings()">Save</button>
         </div>
       </div>
     </div>
@@ -730,6 +762,58 @@
       
       function closeModal() {
         document.getElementById('result-modal').classList.remove('active');
+      }
+      
+      async function openIgnoreSettings() {
+        try {
+          const res = await fetch('/api/repo/ignore');
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          document.getElementById('ignore-defaults').textContent = (data.defaults || []).join('\n');
+          document.getElementById('ignore-extra').value = (data.extra || []).join('\n');
+          document.getElementById('ignore-modal').classList.add('active');
+        } catch (e) {
+          alert('Failed to load ignore settings: ' + e.message);
+        }
+      }
+
+      function closeIgnoreSettings() {
+        document.getElementById('ignore-modal').classList.remove('active');
+      }
+
+      async function saveIgnoreSettings() {
+        const lines = document.getElementById('ignore-extra').value.split('\n').map(s => s.trim()).filter(Boolean);
+        try {
+          const res = await fetch('/api/repo/ignore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'replace', patterns: lines })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          closeIgnoreSettings();
+          // refresh file list
+          selectedFiles.clear();
+          await refreshFiles();
+        } catch (e) {
+          alert('Failed to save ignore settings: ' + e.message);
+        }
+      }
+
+      async function resetIgnoreSettings() {
+        try {
+          const res = await fetch('/api/repo/ignore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'clear' })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          document.getElementById('ignore-extra').value = '';
+          document.getElementById('ignore-defaults').textContent = (data.defaults || []).join('\n');
+        } catch (e) {
+          alert('Failed to reset ignore settings: ' + e.message);
+        }
       }
       
       // Initialize on load

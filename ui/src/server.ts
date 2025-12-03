@@ -1,10 +1,69 @@
 import { z } from "zod";
-import { get_encoding, encoding_for_model, TiktokenModel } from "tiktoken";
+import { get_encoding, encoding_for_model, type TiktokenModel } from "tiktoken";
 import { spawn } from "child_process";
 import { promises as fs, existsSync } from "fs";
 import { join, resolve, relative } from "path";
 import { glob } from "glob";
 import ignore from "ignore";
+
+const GLOBAL_IGNORE_DEFAULTS: string[] = [
+  // Dependencies and lock files
+  "**/node_modules/",
+  "**/.npm/",
+  "**/pnpm-lock.yaml",
+  "**/package-lock.json",
+  "**/bun.lockb",
+  "**/bun.lock",
+  "**/yarn.lock",
+  "**/composer.lock",
+  "**/Gemfile.lock",
+  "**/Cargo.lock",
+  "**/poetry.lock",
+
+  // Build outputs and caches
+  "**/dist/",
+  "**/build/",
+  "**/.next/",
+  "**/.nuxt/",
+  "**/.output/",
+  "**/out/",
+  "**/__pycache__/",
+  "**/.pytest_cache/",
+  "**/.mypy_cache/",
+  "**/.gradle/",
+  "**/.nuget/",
+  "**/.cargo/",
+  "**/.stack-work/",
+  "**/.ccache/",
+  "**/.parcel-cache/",
+  "**/.turbo/",
+
+  // IDE and Editor files
+  "**/.idea/",
+  "**/.vscode/",
+  "**/*.swp",
+  "**/*~",
+  "**/.DS_Store",
+  "**/Thumbs.db",
+
+  // Temp and backup files
+  "**/*.tmp",
+  "**/*.temp",
+  "**/*.bak",
+  "**/*.backup",
+  "**/*.log",
+
+  // Coverage and test reports
+  "**/coverage/",
+  "**/.nyc_output/",
+  "**/test-results/",
+  "**/playwright-report/",
+
+  // Protected/security-sensitive (treat as excluded from selection)
+  "**/secrets/**",
+  "**/keys/**",
+  "**/certs/**",
+];
 
 type EncoderName =
   | "gpt2"
@@ -79,7 +138,8 @@ const changeRepoSchema = z.object({
 // Repository Context Builder functionality
 class RepoContextAPI {
   private repoPath: string;
-  
+  private extraIgnorePatterns: string[] = []; // editable via API
+
   constructor(repoPath: string = process.cwd()) {
     // Prefer explicit env var, then provided arg, then current working directory
     if (process.env.REPO_PATH) {
@@ -96,6 +156,28 @@ class RepoContextAPI {
     return this.repoPath;
   }
 
+  getIgnorePatterns() {
+    return [...this.extraIgnorePatterns];
+  }
+
+  setIgnorePatterns(patterns: string[]) {
+    // de-duplicate and normalize
+    const seen = new Set<string>();
+    this.extraIgnorePatterns = (patterns || [])
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0 && !p.startsWith("#"))
+      .filter((p) => {
+        if (seen.has(p)) return false;
+        seen.add(p);
+        return true;
+      });
+    return this.getIgnorePatterns();
+  }
+
+  appendIgnorePatterns(patterns: string[]) {
+    return this.setIgnorePatterns([...this.extraIgnorePatterns, ...(patterns || [])]);
+  }
+
   setRepositoryPath(newPath: string) {
     const resolvedPath = resolve(newPath);
     if (!existsSync(resolvedPath)) {
@@ -108,32 +190,125 @@ class RepoContextAPI {
 
   async loadIgnorePatterns() {
     const ig = ignore();
-    
-    // Add common ignore patterns
-    ig.add([
-      'node_modules/',
-      '.git/',
-      '.DS_Store',
-      '*.log',
-      'dist/',
-      'build/',
-      'coverage/',
-      '.nyc_output/',
-      '*.tmp',
-      '*.temp',
-      '__pycache__/',
-      '*.pyc',
-      '.pytest_cache/',
-    ]);
 
-    // Load .gitignore
+    // Add global defaults and user-provided patterns first
+    ig.add(GLOBAL_IGNORE_DEFAULTS);
+    ig.add(this.extraIgnorePatterns);
+
+    // Load top-level .gitignore if present
     const gitignorePath = join(this.repoPath, '.gitignore');
     if (existsSync(gitignorePath)) {
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
       ig.add(gitignoreContent);
     }
 
+    // Also respect repo-local excludes if present
+    const gitExclude = join(this.repoPath, '.git', 'info', 'exclude');
+    if (existsSync(gitExclude)) {
+      const gitExcludeContent = await fs.readFile(gitExclude, 'utf8');
+      ig.add(gitExcludeContent);
+    }
+
+    // Fallback: parse nested .gitignore files (handles non-git dirs or when git isn't available).
+    // We prefix patterns with the owning directory so they behave as if evaluated from that folder.
+    try {
+      const nestedGitIgnores = await glob("**/.gitignore", {
+        cwd: this.repoPath,
+        dot: true,
+        nodir: true,
+        ignore: ["**/.git/**"], // never traverse the .git dir
+        follow: false,
+        maxDepth: 10,
+      });
+
+      for (const relPath of nestedGitIgnores) {
+        // skip the repo root .gitignore (already loaded above)
+        if (relPath === ".gitignore") continue;
+
+        const ownerDir = relPath.split("/").slice(0, -1).join("/");
+        const raw = await fs.readFile(join(this.repoPath, relPath), "utf8");
+
+        // Normalize and prefix lines
+        const lines = raw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter((l) => l && !l.startsWith("#"));
+
+        if (lines.length === 0) continue;
+
+        const prefixed = lines.map((line) => {
+          let neg = false;
+          if (line.startsWith("!")) {
+            neg = true;
+            line = line.slice(1);
+          }
+
+          // In .gitignore, a leading "/" means "relative to the .gitignore location".
+          // Without "/", it's relative to that directory (any depth).
+          let mapped: string;
+          if (line.startsWith("/")) {
+            // relative to ownerDir; keep the slash, but anchor under ownerDir
+            mapped = ownerDir ? `${ownerDir}${line}` : line.slice(1); // if at repo root
+          } else {
+            // relative to ownerDir at any depth
+            mapped = ownerDir ? `${ownerDir}/${line}` : line;
+          }
+
+          return neg ? "!" + mapped : mapped;
+        });
+
+        if (prefixed.length) {
+          ig.add(prefixed);
+        }
+      }
+    } catch {
+      // If glob fails for any reason, proceed with what we have.
+    }
+
     return ig;
+  }
+
+  private async gitCheckIgnore(files: string[]): Promise<Set<string> | null> {
+    try {
+      if (!files.length) return new Set<string>();
+
+      return await new Promise<Set<string> | null>((resolve) => {
+        const child = spawn("git", ["check-ignore", "--stdin", "-z"], {
+          cwd: this.repoPath,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+
+        const chunks: Buffer[] = [];
+        child.stdout.on("data", (d) => chunks.push(Buffer.from(d)));
+        child.on("error", () => resolve(null));
+        child.on("close", (code) => {
+          // 0: at least one path is ignored, 1: no paths ignored, >1: error
+          if (code === 0 || code === 1) {
+            const out = Buffer.concat(chunks).toString("utf8");
+            const ignored = new Set<string>();
+            if (out) {
+              for (const name of out.split("\0")) {
+                if (name) ignored.add(name);
+              }
+            }
+            resolve(ignored);
+          } else {
+            resolve(null);
+          }
+        });
+
+        try {
+          // Ensure stdin is NUL-delimited and ends with a trailing NUL to include the last entry
+          const payload = files.join("\0") + "\0";
+          child.stdin.write(payload, "utf8");
+          child.stdin.end();
+        } catch {
+          resolve(null);
+        }
+      });
+    } catch {
+      return null;
+    }
   }
 
   async listFiles(patterns: string[] = ['**/*']) {
@@ -141,54 +316,69 @@ class RepoContextAPI {
     const allFiles = [];
 
     try {
-      // Use a more conservative glob pattern to avoid stack overflow
+      // Merge robust ignore globs to reduce traversal work
+      const combinedIgnore = Array.from(
+        new Set<string>([
+          // hard exclusions to keep traversal light
+          "**/node_modules/**",
+          "**/.git/**",
+          "**/dist/**",
+          "**/build/**",
+          "**/.next/**",
+          "**/coverage/**",
+          "**/__pycache__/**",
+          "**/venv/**",
+          "**/target/**",
+          "**/.turbo/**",
+          "**/.yarn/**",
+          "**/bower_components/**",
+          "**/.cache/**",
+          "**/.npm/**",
+          "**/.pnpm/**",
+          // global defaults
+          ...GLOBAL_IGNORE_DEFAULTS,
+          // user extras
+          ...this.extraIgnorePatterns,
+        ])
+      );
+
       const globOptions = {
         cwd: this.repoPath,
         nodir: true,
-        dot: true,       // Include dot files/folders like .claude
-        follow: false,   // Don't follow symlinks
-        maxDepth: 10,    // Limit depth to prevent stack overflow
-        ignore: [
-          '**/node_modules/**',
-          '**/.git/**',
-          '**/dist/**',
-          '**/build/**',
-          '**/.next/**',
-          '**/coverage/**',
-          '**/__pycache__/**',
-          '**/venv/**',
-          '**/target/**',
-          '**/.turbo/**',
-          '**/.yarn/**',
-          '**/bower_components/**',
-          '**/.cache/**',
-          '**/.npm/**',
-          '**/.pnpm/**'
-        ]
+        dot: true,       // include dot files first; filter later via .gitignore + defaults
+        follow: false,   // don't follow symlinks
+        maxDepth: 10,
+        ignore: combinedIgnore,
       };
 
-      // Try to glob with the pattern, but catch errors
       for (const pattern of patterns) {
         try {
           const matches = await glob(pattern, globOptions);
-          // Add matches in smaller chunks to avoid stack overflow
           for (let i = 0; i < matches.length; i += 100) {
             allFiles.push(...matches.slice(i, i + 100));
           }
         } catch (patternError) {
           console.error(`Error with pattern ${pattern}:`, patternError);
-          // Continue with other patterns
         }
       }
     } catch (error) {
       console.error('Error listing files:', error);
-      // Return empty array if glob completely fails
       return [];
     }
 
-    // Remove duplicates and apply ignore patterns
-    const uniqueFiles = [...new Set(allFiles)]
-      .filter(file => !ig.ignores(file))
+    const deduped = [...new Set(allFiles)];
+
+    // Ask git for authoritative ignore if available
+    let gitIgnored: Set<string> | null = null;
+    try {
+      gitIgnored = await this.gitCheckIgnore(deduped);
+    } catch {
+      gitIgnored = null;
+    }
+
+    const uniqueFiles = deduped
+      .filter((file) => !ig.ignores(file))
+      .filter((file) => !(gitIgnored && gitIgnored.has(file)))
       .sort();
 
     return uniqueFiles;
@@ -266,7 +456,7 @@ class RepoContextAPI {
 
   countTokens(text: string, encoding: string = 'cl100k_base') {
     const enc = getEncoderByName(encoding);
-    const tokens = enc.encode(text, undefined, []);
+    const tokens = enc.encode(text, new Set<string>(), new Set<string>());
     return tokens.length;
   }
 
@@ -566,7 +756,7 @@ const server = Bun.serve({
       // Tokenize and count
       const bytes = new TextEncoder().encode(text).byteLength;
       // Treat special-token-like substrings as normal text by default
-      const tokens = enc.encode(text, undefined, []);
+      const tokens = enc.encode(text, new Set<string>(), new Set<string>());
       const count = tokens.length;
       if (count > maxTokens) {
         return json(
@@ -697,6 +887,37 @@ const server = Bun.serve({
     // Get current repository path
     if (pathname === "/api/repo/current" && req.method === "GET") {
       return json({ path: repoAPI.repositoryPath });
+    }
+
+    // Ignore patterns API
+    if (pathname === "/api/repo/ignore" && req.method === "GET") {
+      return json({
+        defaults: GLOBAL_IGNORE_DEFAULTS,
+        extra: repoAPI.getIgnorePatterns(),
+        repoPath: repoAPI.repositoryPath,
+      });
+    }
+    if (pathname === "/api/repo/ignore" && req.method === "POST") {
+      try {
+        const body = await req.json().catch(() => ({}));
+        const mode = (body?.mode || "replace") as "replace" | "append" | "clear";
+        const patterns = Array.isArray(body?.patterns) ? (body.patterns as string[]) : [];
+
+        if (mode === "clear") {
+          repoAPI.setIgnorePatterns([]);
+        } else if (mode === "append") {
+          repoAPI.appendIgnorePatterns(patterns);
+        } else {
+          repoAPI.setIgnorePatterns(patterns);
+        }
+        return json({
+          ok: true,
+          defaults: GLOBAL_IGNORE_DEFAULTS,
+          extra: repoAPI.getIgnorePatterns(),
+        });
+      } catch (e) {
+        return json({ error: String(e) }, { status: 400 });
+      }
     }
 
     // Get token counts for specific files (cached + concurrent)
