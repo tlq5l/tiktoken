@@ -49,3 +49,24 @@ ui/dist/
 ui/build/
 ui/.cache/
 config/mcporter.json
+
+# AI CLI configs - track main files, ignore backups and plans
+*.bak
+.cursor/plans/
+.cursor/rules/*.bak
+.gemini/
+
+# Keep these tracked for sharing across machines:
+# - .mcp.json
+# - .codex/
+# - .cursor/hooks.json
+# - .cursor/mcp.json
+# - .cursor/rules/
+# - AGENTS.md
+# - CLAUDE.md
+!.claude/
+!.claude/**
+!.codex/
+!.codex/**
+!.gemini/
+!.gemini/**
