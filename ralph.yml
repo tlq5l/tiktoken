@@ -1,0 +1,38 @@
+agent: acp
+agent_priority:
+  - acp
+  - gemini
+  - claude
+  - kiro
+  - qchat
+prompt_file: PROMPT.md
+max_iterations: 100
+max_runtime: 14400
+verbose: false
+adapters:
+  claude:
+    enabled: true
+    timeout: 300
+  kiro:
+    enabled: true
+    timeout: 300
+  q:
+    enabled: true
+    timeout: 300
+  gemini:
+    args:
+      - --allowed-mcp-server-names
+      - chrome-devtools-isolated,RepoPrompt
+    enabled: true
+    timeout: 300
+  acp:
+    enabled: true
+    timeout: 600
+    tool_permissions:
+      agent_command: gemini
+      agent_args:
+        - --allowed-mcp-server-names
+        - chrome-devtools-isolated,RepoPrompt
+        - --yolo
+      permission_mode: auto_approve
+      permission_allowlist: []

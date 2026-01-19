@@ -1,0 +1,11 @@
+[
+  {
+    "id": "init-verify",
+    "description": "Project builds/compiles without errors",
+    "acceptance_criteria": [
+      "init.sh runs successfully",
+      "No build errors"
+    ],
+    "passes": false
+  }
+]
